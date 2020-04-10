@@ -1,0 +1,26 @@
+### Set up the centos6 environment:
+
+## please reboot per below to activate latest kernel and start atd service (needed for wall to work reliably)
+
+yum -y update && yum install -y screen.x86_64 at.x86_64 gcc-c++.x86_64 http://repo.mysql.com/mysql80-community-release-el6.rpm && yum install -y mysql-community-client.x86_64 mysql-community-server.x86_64
+
+chkconfig mysqld off && /bin/cp -a /usr/sbin/mysqld /usr/sbin/mysqld.dist && /bin/cp -a /usr/share/zoneinfo/UTC /etc/localtime && reboot
+
+
+### Usage:
+
+/root/87850/start.sh
+
+
+### Using /root/87850/patchglibc.sh, first edit the desired version and then run the script
+
+vi /root/87850/patchglibc.sh
+
+/root/87850/patchglibc.sh
+
+/root/87850/start.sh
+
+
+## If you had used mysql 8.0 or whatever and are trying a different rpm version, be sure to first issue:
+
+/bin/cp -a /usr/sbin/mysqld /usr/sbin/mysqld.dist
