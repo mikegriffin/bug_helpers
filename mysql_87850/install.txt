@@ -9,6 +9,10 @@ chkconfig mysqld off && /bin/cp -a /usr/sbin/mysqld /usr/sbin/mysqld.dist && /bi
 
 ### Usage:
 
+wget https://raw.githubusercontent.com/mikegriffin/bug_helpers/master/mysql_87850/makescripts.sh
+
+bash makescripts.sh
+
 /root/87850/start.sh
 
 
