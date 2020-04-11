@@ -1,0 +1,84 @@
+I have some bash scripts to demonstrate the file corruption problem on centos6 with the default old version of glibc. Typical runtime is a minute or two. Try restarting if it takes much longer by launching start.sh again.
+
+The scripts are intended to run on a "throw-away" server as they will wipe the datadir, etc. so assume they will damage your vm.
+
+The scripts should reliably write "mysqld got signal 11" to an ibd, MYI, or MYD file after sending a single "/usr/bin/pkill -11 -x mysqld" under the right conditions. If you use innodb_flush_method=O_DIRECT, the corrupt file is more likely to be binlog.index or something like that.
+
+By default, install.txt helps install MySQL 8.0. If you are testing on MySQL 5.6, consider setting innodb_force_recovery=3 in my.cnf, as 5.6 tends to create empty ibd files during crash, which is not what this bug is about.
+
+When start.sh completes, you get a notice like this:
+
+"""
+We intentionally crash the server because it appears to be hung.
+(waiting for user to simulate long semaphore wait with: '/usr/bin/pkill -11 -x mysqld')
+
+screens have quit - suggested actions, issue:
+/root/87850/fdinfo.sh
+/usr/bin/pkill -11 -x mysqld
+grep -lR '^[0-9].*UTC.*signal' /var/lib/mysql 2> /dev/null
+"""
+
+Additional thoughts about the bug and script usage:
+
+### start.sh stops mysqld, kills all screens, deletes existing datadir, then attempts to reproduce the problem anew
+### stop.sh closes mysqld and any screen session
+### disabling flush.sh in start.sh still reproduces, but takes much longer
+
+##############
+### reproduces with ext3 and xfs
+### reproduces with innodb_use_native_aio=0,1
+### reproduces on these cent6 kernels:
+# 2.6.32-754.27.1.el6.x86_64
+# 3.8.13-98.7.1.el6uek.x86_64
+# 4.1.12-124.37.1.el6uek.x86_64
+# 4.4.215-1.el6.elrepo.x86_64
+
+##############
+### This seems to manifest with older versions of glibc (possibly due to "buggy select use")
+### I wonder if this is similar to https://sourceware.org/bugzilla/show_bug.cgi?id=10352
+### Maybe the problem is somewhere around my_safe_freopen in ./mysys/my_fopen.c
+### Possibly the problem could be recreated on modern glibc with -D_FORTIFY_SOURCE=0
+
+## reproduces with default rpm-installed glibc:
+# 67f59e096f46fc59b830c2fed53244ba  glibc-2.12-1.212.el6_10.3.x86_64.rpm
+
+## reproduces with upstream glibc-2.12.1:
+# be0ea9e587f08c87604fe10a91f72afd  glibc-2.12.1.tar.bz2
+
+## reproduces with upstream glibc-2.12.2:
+# 903fcfa547df2f453476800e0838fe52  glibc-2.12.2.tar.bz2
+
+## reproduces with upstream glibc-2.13:
+# 38808215a7c40aa0bb47a5e6d3d12475  glibc-2.13.tar.bz2
+
+### can't reproduce with upstream glibc-2.14:
+# 1588cc22e796c296223744895ebc4cef  glibc-2.14.tar.bz2
+
+##############
+### if you are going to see the bug, you should quickly see the file descriptors of the error log > 2 - try /root/87850/fdinfo.sh
+### the file corruption seems to manifest when stderr fd > 1024, which crash.sh responds to
+### with glibc 2.14, error log seems to always have FD 1 and 2
+
+##############
+### patching glibc
+### if you try a different mysql version in yum, before patching glibc, remember to issue:
+# rpm -e --nodeps mysql-community-client mysql-community-common mysql-community-libs mysql-community-server
+# rm /usr/sbin/mysqld* -f
+# yum install -y mysql-community-client.x86_64 mysql-community-server.x86_64
+# cp -a /usr/sbin/mysqld /usr/sbin/mysqld.dist
+
+### modify line two of 87850/patchglibc.sh to choose one of these versions:
+# glibc-2.12.1
+# glibc-2.12.2
+# glibc-2.13
+# glibc-2.14
+
+### 87850/stop.sh; 87850/patchglibc.sh; 87850/start.sh
+
+Demo:
+
+[root@87850 ~]# bash makescripts.sh
+[root@87850 ~]# /root/87850/start.sh
+[root@87850 ~]# /usr/bin/pkill -11 -x mysqld
+[root@87850 ~]# grep -lR '^[0-9].*UTC.*signal' /var/lib/mysql 2> /dev/null
+/var/lib/mysql/db_1/t_473.ibd
