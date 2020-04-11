@@ -14,6 +14,8 @@ chkconfig mysqld off && /bin/cp -a /usr/sbin/mysqld /usr/sbin/mysqld.dist && /bi
 
 ### Using /root/87850/patchglibc.sh, first edit the desired version and then run the script
 
+/root/87850/stop.sh
+
 vi /root/87850/patchglibc.sh
 
 /root/87850/patchglibc.sh
